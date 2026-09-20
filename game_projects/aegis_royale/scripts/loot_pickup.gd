@@ -8,6 +8,7 @@ var phase := 0.0
 
 func setup(data: Dictionary) -> void:
 	item = data.duplicate(true)
+	bob_origin = position.y
 	collision_layer = 8
 	collision_mask = 2
 	monitoring = true
