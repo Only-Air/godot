@@ -10,8 +10,10 @@ var health := 150.0
 var max_health := 150.0
 var owner_id := 0
 var edit_mask := 0b111111111
+var edit_cycle_index := 0
 var mesh_root: Node3D
 var collision_root: Node3D
+var stored_material: Material
 var building_time := 0.0
 var building_duration := 0.65
 var target_scale := Vector3.ONE
@@ -20,6 +22,7 @@ func setup(type: String, material: Material, creator_id: int = 0, resource_type:
 	piece_type = type
 	owner_id = creator_id
 	material_type = resource_type
+	stored_material = material
 	max_health = {"wood":150.0, "stone":300.0, "metal":500.0}.get(material_type, 150.0)
 	health = max_health * 0.25
 	building_duration = {"wood":0.55, "stone":1.0, "metal":1.55}.get(material_type, 0.7)
@@ -29,7 +32,7 @@ func setup(type: String, material: Material, creator_id: int = 0, resource_type:
 	collision_root = Node3D.new()
 	add_child(mesh_root)
 	add_child(collision_root)
-	_rebuild_geometry(material)
+	_rebuild_geometry(stored_material)
 	target_scale = scale
 	scale = Vector3(target_scale.x, maxf(0.08, target_scale.y * 0.08), target_scale.z)
 
@@ -45,12 +48,13 @@ func _clear_geometry() -> void:
 	for child in collision_root.get_children(): child.queue_free()
 
 func _rebuild_geometry(material: Material = null) -> void:
+	if material != null: stored_material = material
 	_clear_geometry()
 	match piece_type:
-		"wall": _build_wall_grid(material)
-		"floor": _add_box(Vector3(GRID_SIZE, 0.22, GRID_SIZE), Vector3.ZERO, Vector3.ZERO, material)
-		"roof": _build_roof(material)
-		"ramp": _add_box(Vector3(GRID_SIZE, 0.22, 4.6), Vector3(0, 1.15, 0), Vector3(deg_to_rad(-32.0), 0, 0), material)
+		"wall": _build_wall_grid(stored_material)
+		"floor": _add_box(Vector3(GRID_SIZE, 0.22, GRID_SIZE), Vector3.ZERO, Vector3.ZERO, stored_material)
+		"roof": _build_roof(stored_material)
+		"ramp": _add_box(Vector3(GRID_SIZE, 0.22, 4.6), Vector3(0, 1.15, 0), Vector3(deg_to_rad(-32.0), 0, 0), stored_material)
 
 func _build_wall_grid(material: Material) -> void:
 	var cell_w := GRID_SIZE / 3.0
@@ -105,6 +109,14 @@ func edit_preset(preset: String, material: Material = null) -> void:
 		"left_half": edit_mask = 0b110110110
 		"right_half": edit_mask = 0b011011011
 	_rebuild_geometry(material)
+
+func cycle_edit(simple_edit: bool = false) -> void:
+	if piece_type != "wall":
+		rotate_variant()
+		return
+	var presets := ["reset", "window", "half"] if simple_edit else ["reset", "window", "door_left", "door_right", "half", "arch"]
+	edit_cycle_index = (edit_cycle_index + 1) % presets.size()
+	edit_preset(presets[edit_cycle_index])
 
 func simple_edit_from_local_hit(local_hit: Vector3, material: Material = null) -> void:
 	if piece_type != "wall": return
