@@ -80,6 +80,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("build_floor"): _number_action(1, "floor")
 	if event.is_action_pressed("build_ramp"): _number_action(2, "ramp")
 	if event.is_action_pressed("build_roof"): _number_action(3, "roof")
+	if event.is_action_pressed("inventory_slot_5") and not build_mode: inventory.select(4)
 	if event.is_action_pressed("rotate_piece"): build_rotation += PI * 0.5
 	if event.is_action_pressed("edit_piece"): _edit_target()
 	if event.is_action_pressed("reload"): inventory.reload_selected()
