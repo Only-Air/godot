@@ -1,6 +1,8 @@
 class_name TacticalBot
 extends CharacterBody3D
 
+signal eliminated(victim, killer)
+
 var health := 100.0
 var shield := 25.0
 var target: Node3D
@@ -18,6 +20,7 @@ var strategic_goal := Vector3.ZERO
 var last_known_target_position := Vector3.ZERO
 var build_material: StandardMaterial3D
 var weapon := ItemDatabase.weapon("vanguard_ar", "uncommon")
+var last_damage_source: Node
 
 func setup(color: Color, skill: float = 0.6) -> void:
 	aggression = clampf(skill, 0.2, 1.0)
@@ -31,6 +34,7 @@ func setup(color: Color, skill: float = 0.6) -> void:
 
 func _ready() -> void:
 	add_to_group("combatants")
+	add_to_group("bots")
 	collision_layer = 2
 	collision_mask = 5
 	call_deferred("_find_storm")
@@ -79,16 +83,12 @@ func _update_strategy() -> void:
 	if is_instance_valid(target):
 		last_known_target_position = target.global_position
 		var distance := global_position.distance_to(target.global_position)
-		if health < 38.0 and materials >= 40:
-			state = "heal_defend"
-		elif distance < 85.0:
-			state = "combat"
-		else:
-			state = "hunt"
+		if health < 38.0 and materials >= 40: state = "heal_defend"
+		elif distance < 85.0: state = "combat"
+		else: state = "hunt"
 	else:
 		state = "loot"
-		if global_position.distance_to(strategic_goal) < 4.0:
-			strategic_goal = _choose_roam_goal()
+		if global_position.distance_to(strategic_goal) < 4.0: strategic_goal = _choose_roam_goal()
 
 func _execute_state(delta: float) -> void:
 	match state:
@@ -101,11 +101,9 @@ func _execute_state(delta: float) -> void:
 
 func _loot_behavior(delta: float) -> void:
 	var loot := _nearest_loot(32.0)
-	if is_instance_valid(loot):
-		strategic_goal = loot.global_position
+	if is_instance_valid(loot): strategic_goal = loot.global_position
 	_move_toward_goal(strategic_goal, 5.3, delta)
-	if is_instance_valid(loot) and global_position.distance_to(loot.global_position) < 1.6:
-		_collect_loot_node(loot)
+	if is_instance_valid(loot) and global_position.distance_to(loot.global_position) < 1.6: _collect_loot_node(loot)
 
 func _combat_behavior(delta: float) -> void:
 	if not is_instance_valid(target): return
@@ -122,10 +120,8 @@ func _combat_behavior(delta: float) -> void:
 	if randf() < 0.009: strafe_sign *= -1.0
 	if _has_line_of_sight():
 		_shoot(distance)
-		if distance < 18.0 and aggression > 0.62 and materials >= 20 and build_cooldown <= 0.0:
-			_build_ramp_push(flat)
-	elif build_cooldown <= 0.0 and materials >= 10:
-		_build_cover(flat)
+		if distance < 18.0 and aggression > 0.62 and materials >= 20 and build_cooldown <= 0.0: _build_ramp_push(flat)
+	elif build_cooldown <= 0.0 and materials >= 10: _build_cover(flat)
 
 func _defensive_behavior(delta: float) -> void:
 	velocity.x = move_toward(velocity.x, 0.0, 16.0 * delta)
@@ -175,8 +171,7 @@ func _shoot(distance: float) -> void:
 	var accuracy := clampf(0.9 - distance / 130.0, 0.18, 0.82) * aggression
 	if randf() <= accuracy and target.has_method("apply_damage"):
 		target.apply_damage(randf_range(7.0, 14.0) * float(ItemDatabase.RARITY[weapon.rarity].power), self)
-	if randf() < 0.18 and build_cooldown <= 0.0 and materials >= 10:
-		_build_cover((target.global_position - global_position).normalized())
+	if randf() < 0.18 and build_cooldown <= 0.0 and materials >= 10: _build_cover((target.global_position - global_position).normalized())
 
 func _build_cover(enemy_direction: Vector3) -> void:
 	var piece := BuildPiece.new()
@@ -248,7 +243,10 @@ func apply_damage(amount: float, source = null) -> void:
 	shield -= absorbed
 	health -= amount - absorbed
 	if is_instance_valid(source):
+		last_damage_source = source
 		target = source
 		last_known_target_position = source.global_position
 		state = "combat"
-	if health <= 0.0: queue_free()
+	if health <= 0.0:
+		eliminated.emit(self, last_damage_source)
+		queue_free()
