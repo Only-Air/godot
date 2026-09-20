@@ -1,22 +1,27 @@
-; 原创离线战术大逃杀（Godot 4.5 stable 兼容）
+; Aegis Royale - original offline build-battle royale
 config_version=5
 
 [application]
-config/name="Aegis Royale Prototype"
+config/name="Aegis Royale"
+config/description="Original offline build battle royale prototype"
 run/main_scene="res://main.tscn"
-config/features=PackedStringArray("4.5", "GL Compatibility")
+config/features=PackedStringArray("4.5", "Forward Plus")
 
 [display]
-window/size/viewport_width=1280
-window/size/viewport_height=720
-window/size/window_width_override=1280
-window/size/window_height_override=720
+window/size/viewport_width=1600
+window/size/viewport_height=900
 window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
+
+[physics]
+common/physics_ticks_per_second=60
+3d/default_gravity=0.0
 
 [rendering]
-renderer/rendering_method="gl_compatibility"
-renderer/rendering_method.mobile="gl_compatibility"
-environment/defaults/default_clear_color=Color(0.12, 0.18, 0.28, 1)
+renderer/rendering_method="forward_plus"
+anti_aliasing/quality/msaa_3d=1
+environment/defaults/default_clear_color=Color(0.42, 0.62, 0.85, 1)
+lights_and_shadows/directional_shadow/soft_shadow_filter_quality=2
 
 [input]
 move_forward={"deadzone":0.2,"events":[Object(InputEventKey,"physical_keycode":87)]}
@@ -25,24 +30,28 @@ move_left={"deadzone":0.2,"events":[Object(InputEventKey,"physical_keycode":65)]
 move_right={"deadzone":0.2,"events":[Object(InputEventKey,"physical_keycode":68)]}
 jump={"deadzone":0.2,"events":[Object(InputEventKey,"physical_keycode":32)]}
 sprint={"deadzone":0.2,"events":[Object(InputEventKey,"physical_keycode":4194325)]}
+crouch={"deadzone":0.2,"events":[Object(InputEventKey,"physical_keycode":4194326)]}
 fire={"deadzone":0.2,"events":[Object(InputEventMouseButton,"button_index":1)]}
 aim={"deadzone":0.2,"events":[Object(InputEventMouseButton,"button_index":2)]}
 reload={"deadzone":0.2,"events":[Object(InputEventKey,"physical_keycode":82)]}
+interact={"deadzone":0.2,"events":[Object(InputEventKey,"physical_keycode":69)]}
 build_toggle={"deadzone":0.2,"events":[Object(InputEventKey,"physical_keycode":81)]}
-build_wall={"deadzone":0.2,"events":[Object(InputEventKey,"physical_keycode":49)]}
-build_floor={"deadzone":0.2,"events":[Object(InputEventKey,"physical_keycode":50)]}
-build_ramp={"deadzone":0.2,"events":[Object(InputEventKey,"physical_keycode":51)]}
-build_roof={"deadzone":0.2,"events":[Object(InputEventKey,"physical_keycode":52)]}
-inventory_slot_5={"deadzone":0.2,"events":[Object(InputEventKey,"physical_keycode":53)]}
 edit_piece={"deadzone":0.2,"events":[Object(InputEventKey,"physical_keycode":70)]}
 rotate_piece={"deadzone":0.2,"events":[Object(InputEventKey,"physical_keycode":71)]}
 simple_mode={"deadzone":0.2,"events":[Object(InputEventKey,"physical_keycode":86)]}
-cycle_material={"deadzone":0.2,"events":[Object(InputEventKey,"physical_keycode":90)]}
-interact={"deadzone":0.2,"events":[Object(InputEventKey,"physical_keycode":69)]}
+material_cycle={"deadzone":0.2,"events":[Object(InputEventKey,"physical_keycode":90)]}
 pause={"deadzone":0.2,"events":[Object(InputEventKey,"physical_keycode":4194305)]}
+slot_1={"deadzone":0.2,"events":[Object(InputEventKey,"physical_keycode":49)]}
+slot_2={"deadzone":0.2,"events":[Object(InputEventKey,"physical_keycode":50)]}
+slot_3={"deadzone":0.2,"events":[Object(InputEventKey,"physical_keycode":51)]}
+slot_4={"deadzone":0.2,"events":[Object(InputEventKey,"physical_keycode":52)]}
+slot_5={"deadzone":0.2,"events":[Object(InputEventKey,"physical_keycode":53)]}
+wheel_up={"deadzone":0.2,"events":[Object(InputEventMouseButton,"button_index":4)]}
+wheel_down={"deadzone":0.2,"events":[Object(InputEventMouseButton,"button_index":5)]}
+debug_spawn={"deadzone":0.2,"events":[Object(InputEventKey,"physical_keycode":4194332)]}
 
 [layer_names]
 3d_physics/layer_1="World"
-3d_physics/layer_2="Players"
+3d_physics/layer_2="Actors"
 3d_physics/layer_3="Builds"
 3d_physics/layer_4="Loot"
