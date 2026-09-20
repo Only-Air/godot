@@ -10,6 +10,7 @@ var paused := false
 func setup(controlled_player: RoyalePlayer, local_profile: LocalProfile) -> void:
 	player = controlled_player
 	profile = local_profile
+	player.set_meta("mouse_sensitivity", float(profile.settings.mouse_sensitivity))
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_build_menu()
 	panel.visible = false
@@ -49,6 +50,7 @@ func _build_menu() -> void:
 	panel.add_child(sensitivity_label)
 	sensitivity.value_changed.connect(func(value):
 		profile.settings.mouse_sensitivity = value
+		player.set_meta("mouse_sensitivity", value)
 		_update_sensitivity_label(value)
 	)
 	_update_sensitivity_label(sensitivity.value)
@@ -71,7 +73,7 @@ func _build_menu() -> void:
 	)
 	panel.add_child(simple_edit)
 	var help := Label.new()
-	help.text = "AI 数量和难度在下一局生效。\n当前比赛完全离线；退出不会上传任何数据。"
+	help.text = "灵敏度与简易模式立即应用并可保存。\nAI 数量和难度在下一局生效。\n当前比赛完全离线；退出不会上传任何数据。"
 	help.position = Vector2(40, 285)
 	help.add_theme_font_size_override("font_size", 18)
 	panel.add_child(help)
@@ -99,4 +101,4 @@ func _build_menu() -> void:
 	panel.add_child(save)
 
 func _update_sensitivity_label(value: float) -> void:
-	sensitivity_label.text = "鼠标灵敏度：%.2f（下一局完整应用）" % value
+	sensitivity_label.text = "鼠标灵敏度：%.2f" % value
