@@ -6,6 +6,7 @@ var lobby_layer: CanvasLayer
 var world_started := false
 
 func _ready() -> void:
+	seed(Time.get_unix_time_from_system())
 	_show_lobby()
 
 func _show_lobby() -> void:
@@ -21,24 +22,24 @@ func _show_lobby() -> void:
 	title.add_theme_font_size_override("font_size", 54)
 	background.add_child(title)
 	var subtitle := Label.new()
-	subtitle.text = "原创战术大逃杀原型 · 群岛行动"
+	subtitle.text = "原创离线建造大逃杀 · 群岛行动"
 	subtitle.position = Vector2(75, 132)
 	subtitle.add_theme_font_size_override("font_size", 22)
 	background.add_child(subtitle)
 	var feature := Label.new()
-	feature.text = "第三人称战斗\n动态风暴圈\n模块化建造与编辑\n简易建造 / 简易编辑\n会搭建掩体与包围走位的战术 AI"
+	feature.text = "落地搜刮与五槽物品栏\n三种材料采集与即时建造\n动态风暴和主题兴趣点\n普通 / 简易建造与编辑\n会转点、搭建掩体和评估交战距离的 AI"
 	feature.position = Vector2(75, 230)
 	feature.add_theme_font_size_override("font_size", 24)
 	background.add_child(feature)
 	var play := Button.new()
-	play.text = "开始单人演练"
+	play.text = "开始离线演练"
 	play.position = Vector2(890, 515)
 	play.size = Vector2(290, 64)
 	play.add_theme_font_size_override("font_size", 25)
 	play.pressed.connect(_start_match)
 	background.add_child(play)
 	var settings := Button.new()
-	settings.text = "设置（原型）"
+	settings.text = "设置"
 	settings.position = Vector2(890, 595)
 	settings.size = Vector2(290, 48)
 	settings.pressed.connect(_show_settings)
@@ -46,8 +47,8 @@ func _show_lobby() -> void:
 
 func _show_settings() -> void:
 	var popup := AcceptDialog.new()
-	popup.title = "设置"
-	popup.dialog_text = "画面：兼容渲染器\n鼠标灵敏度：默认\n建造设置：比赛中按 V 切换简易模式\n辅助功能：高对比 HUD 已启用"
+	popup.title = "离线设置"
+	popup.dialog_text = "画面：兼容渲染器\n比赛：15 名战术 AI\n建造：比赛中按 V 切换简易模式\n辅助功能：高对比 HUD 已启用\n联网功能：关闭（完全离线）"
 	popup.size = Vector2i(480, 300)
 	lobby_layer.add_child(popup)
 	popup.popup_centered()
@@ -113,27 +114,56 @@ func _create_island() -> void:
 	collider.shape = shape
 	collider.position.y = -1.5
 	ground.add_child(collider)
+	_create_central_hub()
+	for i in 34:
+		_create_landmark(Vector3(randf_range(-94, 94), 0, randf_range(-94, 94)), i)
+	for i in 42:
+		_create_harvest_prop(Vector3(randf_range(-100, 100), 0, randf_range(-100, 100)), i)
+	for i in 22:
+		_create_loot_container(Vector3(randf_range(-94, 94), 0, randf_range(-94, 94)), i % 7 == 0)
 	for i in 28:
-		_create_landmark(Vector3(randf_range(-90, 90), 0, randf_range(-90, 90)), i)
+		_spawn_floor_loot(Vector3(randf_range(-98, 98), 0.7, randf_range(-98, 98)))
+
+func _create_central_hub() -> void:
+	for i in 8:
+		var angle := TAU * float(i) / 8.0
+		_create_landmark(Vector3(cos(angle) * 17.0, 0, sin(angle) * 17.0), 100 + i)
+	_create_loot_container(Vector3(0, 0, 0), true)
+	_create_loot_container(Vector3(4, 0, 0), true)
+	_create_loot_container(Vector3(-4, 0, 0), true)
 
 func _create_landmark(pos: Vector3, index: int) -> void:
-	if Vector2(pos.x, pos.z).length() > 98.0: return
-	var body := StaticBody3D.new()
+	if Vector2(pos.x, pos.z).length() > 101.0: return
+	var body := HarvestProp.new()
 	body.position = pos
-	body.collision_layer = 1
 	add_child(body)
-	var mesh := MeshInstance3D.new()
-	var box := BoxMesh.new()
-	box.size = Vector3(randf_range(5, 12), randf_range(3, 10), randf_range(5, 12))
-	mesh.mesh = box
-	mesh.position.y = box.size.y * 0.5
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = [Color("d67c5c"), Color("d4bd67"), Color("6da4a8"), Color("876ba8")][index % 4]
-	mesh.material_override = mat
-	body.add_child(mesh)
-	var collision := CollisionShape3D.new()
-	var shape := BoxShape3D.new()
-	shape.size = box.size
-	collision.shape = shape
-	collision.position.y = box.size.y * 0.5
-	body.add_child(collision)
+	var size := Vector3(randf_range(5, 12), randf_range(3, 10), randf_range(5, 12))
+	body.setup("stone", size, [Color("d67c5c"), Color("d4bd67"), Color("6da4a8"), Color("876ba8")][index % 4])
+
+func _create_harvest_prop(pos: Vector3, index: int) -> void:
+	if Vector2(pos.x, pos.z).length() > 102.0: return
+	var prop := HarvestProp.new()
+	prop.position = pos
+	add_child(prop)
+	if index % 3 == 0:
+		prop.setup("wood", Vector3(1.2, randf_range(4.0, 7.5), 1.2), Color("4b713f"))
+	elif index % 3 == 1:
+		prop.setup("stone", Vector3(randf_range(1.5, 3.5), randf_range(1.2, 2.8), randf_range(1.5, 3.5)), Color("777e83"))
+	else:
+		prop.setup("metal", Vector3(randf_range(2.0, 4.5), randf_range(1.0, 2.2), randf_range(1.5, 3.0)), Color("587180"))
+
+func _create_loot_container(pos: Vector3, high_tier: bool) -> void:
+	if Vector2(pos.x, pos.z).length() > 104.0: return
+	var container := LootContainer.new()
+	container.position = pos
+	add_child(container)
+	container.setup(1 if high_tier else 0)
+
+func _spawn_floor_loot(pos: Vector3) -> void:
+	if Vector2(pos.x, pos.z).length() > 104.0: return
+	var pickup := LootPickup.new()
+	pickup.position = pos
+	add_child(pickup)
+	var item := ItemDatabase.random_weapon(2)
+	item.kind = "weapon"
+	pickup.setup(item)
