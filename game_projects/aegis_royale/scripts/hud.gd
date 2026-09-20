@@ -6,6 +6,7 @@ var storm: StormController
 var stats_label: Label
 var storm_label: Label
 var alive_label: Label
+var inventory_label: Label
 var crosshair: Label
 var help_panel: ColorRect
 
@@ -17,9 +18,13 @@ func setup(controlled_player: RoyalePlayer, storm_controller: StormController) -
 
 func _build_ui() -> void:
 	stats_label = Label.new()
-	stats_label.position = Vector2(28, 630)
-	stats_label.add_theme_font_size_override("font_size", 21)
+	stats_label.position = Vector2(24, 618)
+	stats_label.add_theme_font_size_override("font_size", 20)
 	add_child(stats_label)
+	inventory_label = Label.new()
+	inventory_label.position = Vector2(470, 642)
+	inventory_label.add_theme_font_size_override("font_size", 18)
+	add_child(inventory_label)
 	storm_label = Label.new()
 	storm_label.position = Vector2(450, 22)
 	storm_label.add_theme_font_size_override("font_size", 20)
@@ -36,11 +41,11 @@ func _build_ui() -> void:
 	help_panel = ColorRect.new()
 	help_panel.color = Color(0.02, 0.04, 0.08, 0.72)
 	help_panel.position = Vector2(18, 18)
-	help_panel.size = Vector2(360, 168)
+	help_panel.size = Vector2(380, 184)
 	add_child(help_panel)
 	var help := Label.new()
 	help.position = Vector2(12, 9)
-	help.text = "WASD 移动 / Shift 冲刺 / 空格跳跃\n左键射击或建造　R 换弹\nQ 战斗/建造　1-4 选择结构　G 旋转\nF 编辑准星所指结构　V 切换简易模式\n简易建造：结构更贴近角色、快速落板\n简易编辑：墙体在完整/半墙之间切换"
+	help.text = "WASD 移动 / Shift 冲刺 / 空格跳跃\n左键射击、使用或建造　R 换弹　E 搜索\nQ 战斗/建造　1-4 物品槽或建造结构\nF 编辑己方结构　G 旋转　V 简易模式\n空物品槽左键可采集场景材料\n靠近发光战利品自动拾取"
 	help_panel.add_child(help)
 	_refresh()
 
@@ -51,5 +56,21 @@ func _process(_delta: float) -> void:
 func _refresh() -> void:
 	if not is_instance_valid(player): return
 	var mode := "建造" if player.build_mode else "战斗"
-	var simple := "简易建造/编辑：开" if player.simple_build else "简易建造/编辑：关"
-	stats_label.text = "生命 %.0f　护盾 %.0f　弹药 %d/%d　材料 %d\n%s模式　%s　结构：%s" % [player.health, player.shield, player.ammo_in_mag, player.reserve_ammo, player.materials, mode, simple, player.selected_piece]
+	var simple := "简易：开" if player.simple_build else "简易：关"
+	var selected := player.inventory.selected()
+	var item_text := "采集工具"
+	var ammo_text := ""
+	if selected.get("kind", "") == "weapon":
+		item_text = "%s（%s）" % [selected.name, ItemDatabase.RARITY[selected.rarity].label]
+		ammo_text = "　弹药 %d/%d" % [int(selected.loaded), int(player.inventory.ammo[selected.ammo])]
+	elif selected.get("kind", "") == "consumable":
+		item_text = "%s ×%d" % [selected.name, int(selected.quantity)]
+	stats_label.text = "生命 %.0f　护盾 %.0f　%s%s\n木 %d　石 %d　金属 %d　%s　%s" % [player.health, player.shield, item_text, ammo_text, int(player.inventory.resources.wood), int(player.inventory.resources.stone), int(player.inventory.resources.metal), mode, simple]
+	var slot_parts: Array[String] = []
+	for i in player.inventory.slots.size():
+		var slot := player.inventory.slots[i]
+		var label := "空"
+		if not slot.is_empty(): label = slot.get("name", "物品")
+		var marker := ">" if i == player.inventory.selected_slot else " "
+		slot_parts.append("%s%d:%s" % [marker, i + 1, label])
+	inventory_label.text = "　".join(slot_parts)
