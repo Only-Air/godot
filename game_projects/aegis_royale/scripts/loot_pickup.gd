@@ -11,6 +11,7 @@ func setup(data: Dictionary) -> void:
 	collision_layer = 8
 	collision_mask = 2
 	monitoring = true
+	add_to_group("loot_pickups")
 	_create_visual()
 	body_entered.connect(_on_body_entered)
 
