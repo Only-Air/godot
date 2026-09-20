@@ -109,6 +109,9 @@ func _create_world() -> void:
 	match_controller = MatchController.new()
 	add_child(match_controller)
 	match_controller.setup(player, profile)
+	var pause_menu := PauseMenu.new()
+	add_child(pause_menu)
+	pause_menu.setup(player, profile)
 
 func _spawn_near_poi(index: int) -> Vector3:
 	var poi: Dictionary = map_generator.poi_data[index % map_generator.poi_data.size()]
