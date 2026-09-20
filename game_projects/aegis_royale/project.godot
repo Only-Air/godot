@@ -1,4 +1,4 @@
-; 原创战术大逃杀原型（Godot 4.8）
+; 原创离线战术大逃杀（Godot 4.8）
 config_version=5
 
 [application]
@@ -33,6 +33,7 @@ build_wall={"deadzone":0.2,"events":[Object(InputEventKey,"physical_keycode":49)
 build_floor={"deadzone":0.2,"events":[Object(InputEventKey,"physical_keycode":50)]}
 build_ramp={"deadzone":0.2,"events":[Object(InputEventKey,"physical_keycode":51)]}
 build_roof={"deadzone":0.2,"events":[Object(InputEventKey,"physical_keycode":52)]}
+inventory_slot_5={"deadzone":0.2,"events":[Object(InputEventKey,"physical_keycode":53)]}
 edit_piece={"deadzone":0.2,"events":[Object(InputEventKey,"physical_keycode":70)]}
 rotate_piece={"deadzone":0.2,"events":[Object(InputEventKey,"physical_keycode":71)]}
 simple_mode={"deadzone":0.2,"events":[Object(InputEventKey,"physical_keycode":86)]}
