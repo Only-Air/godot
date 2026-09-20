@@ -40,7 +40,7 @@ func _apply_geometry(material: Material) -> void:
 	mesh_instance.mesh = box
 	collision_shape.shape = shape
 
-func apply_damage(amount: float) -> void:
+func apply_damage(amount: float, _source = null) -> void:
 	health -= amount
 	if health <= 0.0:
 		queue_free()
