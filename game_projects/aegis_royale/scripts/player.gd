@@ -37,7 +37,7 @@ func _ready() -> void:
 	inventory.changed.connect(_inventory_changed)
 	_create_build_materials()
 	build_preview = BuildPreview.new()
-	get_tree().current_scene.call_deferred("add_child", build_preview)
+	get_parent().call_deferred("add_child", build_preview)
 	build_preview.visible = false
 
 func _create_body() -> void:
@@ -228,7 +228,7 @@ func _apply_recoil(weapon: Dictionary) -> void:
 
 func _fire_projectile(weapon: Dictionary) -> void:
 	var projectile: CombatProjectile = CombatProjectile.new()
-	get_tree().current_scene.add_child(projectile)
+	get_parent().add_child(projectile)
 	var center: Vector2 = camera.get_viewport().get_visible_rect().size * 0.5
 	var direction: Vector3 = camera.project_ray_normal(center)
 	projectile.setup(camera.global_position + direction * 1.2, direction, self, weapon)
@@ -258,7 +258,7 @@ func _place_build() -> void:
 	_update_build_preview()
 	if not preview_valid or not inventory.spend_resource(selected_material, 10): return
 	var piece: BuildPiece = BuildPiece.new()
-	get_tree().current_scene.add_child(piece)
+	get_parent().add_child(piece)
 	piece.global_transform = preview_transform
 	piece.setup(selected_piece, build_materials[selected_material], get_instance_id(), selected_material)
 	if simple_build and selected_piece == "ramp" and Input.is_action_pressed("sprint"): _place_companion_wall(preview_transform)
@@ -267,7 +267,7 @@ func _place_build() -> void:
 func _place_companion_wall(base_transform: Transform3D) -> void:
 	if not inventory.spend_resource(selected_material, 10): return
 	var wall: BuildPiece = BuildPiece.new()
-	get_tree().current_scene.add_child(wall)
+	get_parent().add_child(wall)
 	wall.global_transform = base_transform.translated_local(Vector3(0, 0, -2.0))
 	wall.setup("wall", build_materials[selected_material], get_instance_id(), selected_material)
 
