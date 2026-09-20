@@ -1,0 +1,76 @@
+name: Aegis Royale Release Package
+
+on:
+  push:
+    branches: [feature/original-battle-royale-prototype]
+    paths:
+      - "game_projects/aegis_royale/**"
+      - ".github/workflows/aegis_royale_release.yml"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag; blank uses aegis-royale-latest"
+        required: false
+        type: string
+      prerelease:
+        description: "Mark as prerelease"
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: write
+
+concurrency:
+  group: aegis-royale-release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  package-project:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Read version
+        id: version
+        shell: bash
+        run: |
+          VERSION=$(tr -d '\r\n' < game_projects/aegis_royale/VERSION)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+      - name: Stage project
+        shell: bash
+        run: |
+          mkdir -p dist/AegisRoyale
+          cp -R game_projects/aegis_royale/. dist/AegisRoyale/
+          find dist/AegisRoyale -type d -name '.godot' -prune -exec rm -rf {} +
+      - name: Package
+        shell: bash
+        run: |
+          cd dist
+          zip -9 -r "AegisRoyale-${{ steps.version.outputs.version }}-GodotProject.zip" AegisRoyale
+          sha256sum "AegisRoyale-${{ steps.version.outputs.version }}-GodotProject.zip" > "AegisRoyale-${{ steps.version.outputs.version }}-SHA256SUMS.txt"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AegisRoyale-${{ steps.version.outputs.version }}
+          path: dist/AegisRoyale-*
+      - name: Resolve release tag
+        id: release
+        shell: bash
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          if [ -n "$INPUT_TAG" ]; then
+            echo "tag=$INPUT_TAG" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=aegis-royale-latest" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Publish Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.release.outputs.tag }}
+          name: Aegis Royale ${{ steps.version.outputs.version }}
+          body_path: game_projects/aegis_royale/RELEASE_NOTES.md
+          prerelease: ${{ github.event_name != 'workflow_dispatch' || inputs.prerelease }}
+          make_latest: false
+          files: |
+            dist/AegisRoyale-${{ steps.version.outputs.version }}-GodotProject.zip
+            dist/AegisRoyale-${{ steps.version.outputs.version }}-SHA256SUMS.txt
