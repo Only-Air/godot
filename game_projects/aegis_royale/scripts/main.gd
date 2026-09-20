@@ -95,7 +95,7 @@ func _create_world() -> void:
 	player.simple_edit = bool(profile.settings.simple_edit_default)
 	drop_controller = DropController.new()
 	add_child(drop_controller)
-	drop_controller.setup(player, Vector3(-88, 74, -88))
+	drop_controller.setup(player, Vector3(-70, 74, -70))
 	var bot_count := clampi(int(profile.settings.ai_count), 7, 63)
 	for i in bot_count:
 		var bot := TacticalBot.new()
