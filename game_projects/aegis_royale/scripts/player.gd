@@ -75,8 +75,9 @@ func _create_build_materials() -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
-		rotate_y(-event.relative.x * 0.0025)
-		pivot.rotation.x = clamp(pivot.rotation.x - event.relative.y * 0.0025, -1.15, 0.75)
+		var sensitivity := float(get_meta("mouse_sensitivity", 1.0))
+		rotate_y(-event.relative.x * 0.0025 * sensitivity)
+		pivot.rotation.x = clamp(pivot.rotation.x - event.relative.y * 0.0025 * sensitivity, -1.15, 0.75)
 	if event.is_action_pressed("build_toggle"):
 		build_mode = not build_mode
 		if is_instance_valid(build_preview): build_preview.visible = build_mode
@@ -102,8 +103,7 @@ func _number_action(slot: int, piece: String) -> void:
 	if build_mode:
 		selected_piece = piece
 		if is_instance_valid(build_preview): build_preview.rebuild(piece)
-	else:
-		inventory.select(slot)
+	else: inventory.select(slot)
 	stats_changed.emit()
 
 func _physics_process(delta: float) -> void:
@@ -155,8 +155,7 @@ func _calculate_build_transform() -> Transform3D:
 	target.x = snappedf(target.x, 4.0)
 	target.z = snappedf(target.z, 4.0)
 	target.y = snappedf(maxf(0.0, target.y), 3.0)
-	var yaw := snappedf(rotation.y + build_rotation, PI * 0.5)
-	return Transform3D(Basis(Vector3.UP, yaw), target)
+	return Transform3D(Basis(Vector3.UP, snappedf(rotation.y + build_rotation, PI * 0.5)), target)
 
 func _can_place_build(candidate: Transform3D) -> bool:
 	if int(inventory.resources.get(selected_material, 0)) < 10: return false
@@ -205,8 +204,7 @@ func _fire(weapon: Dictionary) -> void:
 		query.exclude = [self]
 		var hit := get_world_3d().direct_space_state.intersect_ray(query)
 		if hit and hit.collider.has_method("apply_damage"):
-			var distance := origin.distance_to(hit.position)
-			var damage := ItemDatabase.damage_at_distance(weapon, distance)
+			var damage := ItemDatabase.damage_at_distance(weapon, origin.distance_to(hit.position))
 			var critical := false
 			if hit.collider is RoyalePlayer or hit.collider is TacticalBot:
 				critical = hit.collider.to_local(hit.position).y > 1.35
@@ -218,8 +216,7 @@ func _fire(weapon: Dictionary) -> void:
 
 func _apply_recoil(weapon: Dictionary) -> void:
 	var amount := float(weapon.get("recoil", 0.01))
-	var aim_multiplier := 0.65 if Input.is_action_pressed("aim") else 1.0
-	var applied := amount * aim_multiplier
+	var applied := amount * (0.65 if Input.is_action_pressed("aim") else 1.0)
 	pivot.rotation.x = clamp(pivot.rotation.x - applied, -1.15, 0.75)
 	recoil_pitch += applied
 	rotate_y(randf_range(-applied * 0.25, applied * 0.25))
