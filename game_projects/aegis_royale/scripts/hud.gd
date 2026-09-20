@@ -10,6 +10,9 @@ var alive_label: Label
 var inventory_label: Label
 var drop_label: Label
 var crosshair: Label
+var hit_marker: Label
+var damage_label: Label
+var hit_timer := 0.0
 var help_panel: ColorRect
 
 func setup(controlled_player: RoyalePlayer, storm_controller: StormController, drop: DropController = null) -> void:
@@ -18,6 +21,7 @@ func setup(controlled_player: RoyalePlayer, storm_controller: StormController, d
 	drop_controller = drop
 	_build_ui()
 	player.stats_changed.connect(_refresh)
+	player.hit_confirmed.connect(_on_hit_confirmed)
 
 func _build_ui() -> void:
 	stats_label = Label.new()
@@ -41,25 +45,53 @@ func _build_ui() -> void:
 	drop_label.add_theme_font_size_override("font_size", 23)
 	add_child(drop_label)
 	crosshair = Label.new()
-	crosshair.text = "+"
-	crosshair.position = Vector2(635, 350)
-	crosshair.add_theme_font_size_override("font_size", 26)
+	crosshair.text = "·"
+	crosshair.add_theme_font_size_override("font_size", 28)
 	add_child(crosshair)
+	hit_marker = Label.new()
+	hit_marker.text = "×"
+	hit_marker.position = Vector2(629, 342)
+	hit_marker.add_theme_font_size_override("font_size", 34)
+	hit_marker.visible = false
+	add_child(hit_marker)
+	damage_label = Label.new()
+	damage_label.position = Vector2(654, 322)
+	damage_label.add_theme_font_size_override("font_size", 20)
+	damage_label.visible = false
+	add_child(damage_label)
 	help_panel = ColorRect.new()
 	help_panel.color = Color(0.02, 0.04, 0.08, 0.72)
 	help_panel.position = Vector2(18, 18)
-	help_panel.size = Vector2(410, 202)
+	help_panel.size = Vector2(410, 220)
 	add_child(help_panel)
 	var help := Label.new()
 	help.position = Vector2(12, 9)
-	help.text = "WASD 移动 / Shift 冲刺 / 空格跳跃\n左键射击、使用或建造　R 换弹　E 搜索\nQ 战斗/建造　1-5 物品槽，建造时 1-4\nF 编辑己方结构　G 旋转　V 简易模式\nZ 循环木材/石材/金属\n空物品槽左键可采集场景材料\n建造预览：蓝色可放置，红色不可放置"
+	help.text = "WASD 移动 / Shift 冲刺 / 空格跳跃\n左键射击、使用或建造　右键瞄准　R 换弹\nE 搜索　Q 战斗/建造　1-5 物品槽\n建造时 1-4 选结构　F 编辑　G 旋转\nV 简易模式　Z 循环木/石/金属\n空物品槽左键采集场景材料\n建造预览：蓝色可放置，红色不可放置"
 	help_panel.add_child(help)
 	_refresh()
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	if is_instance_valid(storm): storm_label.text = storm.status_text()
 	alive_label.text = "存活 %d" % get_tree().get_nodes_in_group("combatants").size()
 	drop_label.text = drop_controller.status_text() if is_instance_valid(drop_controller) else ""
+	if is_instance_valid(player):
+		var offset := clampf(player.current_spread_pixels * 0.18, 0.0, 16.0)
+		crosshair.text = "└　┘\n\n┌　┐"
+		crosshair.position = Vector2(612 - offset, 326 - offset)
+	if hit_timer > 0.0:
+		hit_timer -= delta
+		if hit_timer <= 0.0:
+			hit_marker.visible = false
+			damage_label.visible = false
+
+func _on_hit_confirmed(damage: float, critical: bool) -> void:
+	hit_timer = 0.22 if not critical else 0.34
+	hit_marker.visible = true
+	damage_label.visible = true
+	damage_label.text = "%d" % roundi(damage)
+	var color := Color("ffd447") if critical else Color.WHITE
+	hit_marker.modulate = color
+	damage_label.modulate = color
 
 func _refresh() -> void:
 	if not is_instance_valid(player): return
