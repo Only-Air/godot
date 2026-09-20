@@ -18,6 +18,9 @@ var gravity := 22.0
 var camera: Camera3D
 var pivot: Node3D
 var build_materials := {}
+var build_preview: BuildPreview
+var preview_valid := false
+var preview_transform := Transform3D.IDENTITY
 
 func _ready() -> void:
 	add_to_group("combatants")
@@ -29,6 +32,9 @@ func _ready() -> void:
 	inventory.add_resource("wood", 100)
 	inventory.changed.connect(_inventory_changed)
 	_create_build_materials()
+	build_preview = BuildPreview.new()
+	get_tree().current_scene.call_deferred("add_child", build_preview)
+	build_preview.visible = false
 
 func _create_body() -> void:
 	var collider := CollisionShape3D.new()
@@ -71,6 +77,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE if Input.mouse_mode == Input.MOUSE_MODE_CAPTURED else Input.MOUSE_MODE_CAPTURED
 	if event.is_action_pressed("build_toggle"):
 		build_mode = not build_mode
+		if is_instance_valid(build_preview): build_preview.visible = build_mode
 		stats_changed.emit()
 	if event.is_action_pressed("simple_mode"):
 		simple_build = not simple_build
@@ -90,8 +97,11 @@ func _unhandled_input(event: InputEvent) -> void:
 		else: _use_selected()
 
 func _number_action(slot: int, piece: String) -> void:
-	if build_mode: selected_piece = piece
-	else: inventory.select(slot)
+	if build_mode:
+		selected_piece = piece
+		if is_instance_valid(build_preview): build_preview.rebuild(piece)
+	else:
+		inventory.select(slot)
 	stats_changed.emit()
 
 func _physics_process(delta: float) -> void:
@@ -103,9 +113,54 @@ func _physics_process(delta: float) -> void:
 	velocity.x = move_toward(velocity.x, direction.x * speed, 35.0 * delta)
 	velocity.z = move_toward(velocity.z, direction.z * speed, 35.0 * delta)
 	move_and_slide()
+	if build_mode: _update_build_preview()
 	if Input.is_action_pressed("fire") and not build_mode:
 		var item := inventory.selected()
 		if item.get("kind", "") == "weapon" and float(item.fire_rate) > 2.0: _fire(item)
+
+func _update_build_preview() -> void:
+	if not is_instance_valid(build_preview): return
+	preview_transform = _calculate_build_transform()
+	preview_valid = _can_place_build(preview_transform)
+	build_preview.global_transform = preview_transform
+	build_preview.set_valid(preview_valid)
+	build_preview.visible = true
+
+func _calculate_build_transform() -> Transform3D:
+	var ray_origin := camera.global_position
+	var ray_end := ray_origin + -camera.global_transform.basis.z * (5.0 if simple_build else 8.0)
+	var query := PhysicsRayQueryParameters3D.create(ray_origin, ray_end)
+	query.exclude = [self]
+	query.collision_mask = 1 | 4
+	var hit := get_world_3d().direct_space_state.intersect_ray(query)
+	var target := hit.position if hit else ray_end
+	if simple_build:
+		target = global_position + -global_transform.basis.z * 2.4
+	target.x = snappedf(target.x, 4.0)
+	target.z = snappedf(target.z, 4.0)
+	target.y = snappedf(maxf(0.0, target.y), 3.0)
+	var yaw := snappedf(rotation.y + build_rotation, PI * 0.5)
+	return Transform3D(Basis(Vector3.UP, yaw), target)
+
+func _can_place_build(candidate: Transform3D) -> bool:
+	if int(inventory.resources.get(selected_material, 0)) < 10: return false
+	var position_to_test := candidate.origin
+	if position_to_test.distance_to(global_position) > 10.0: return false
+	for existing in get_tree().get_nodes_in_group("build_pieces"):
+		if not is_instance_valid(existing): continue
+		if existing.global_position.distance_to(position_to_test) < 0.45 and existing.piece_type == selected_piece: return false
+	var supported := position_to_test.y <= 0.25
+	if not supported:
+		var down_query := PhysicsRayQueryParameters3D.create(position_to_test + Vector3.UP * 0.5, position_to_test + Vector3.DOWN * 1.2)
+		down_query.exclude = [self]
+		down_query.collision_mask = 1 | 4
+		supported = not get_world_3d().direct_space_state.intersect_ray(down_query).is_empty()
+	if not supported:
+		for existing in get_tree().get_nodes_in_group("build_pieces"):
+			if is_instance_valid(existing) and existing.global_position.distance_to(position_to_test) <= 4.2:
+				supported = true
+				break
+	return supported
 
 func _use_selected() -> void:
 	var item := inventory.selected()
@@ -145,8 +200,7 @@ func _harvest_swing() -> void:
 	var query := PhysicsRayQueryParameters3D.create(origin, origin + -camera.global_transform.basis.z * 4.0)
 	query.exclude = [self]
 	var hit := get_world_3d().direct_space_state.intersect_ray(query)
-	if hit and hit.collider.has_method("harvest"):
-		hit.collider.harvest(50.0, self)
+	if hit and hit.collider.has_method("harvest"): hit.collider.harvest(50.0, self)
 
 func _interact() -> void:
 	var origin := camera.global_position
@@ -156,27 +210,35 @@ func _interact() -> void:
 	if hit and hit.collider.has_method("interact"): hit.collider.interact(self)
 
 func _place_build() -> void:
+	_update_build_preview()
+	if not preview_valid: return
 	if not inventory.spend_resource(selected_material, 10): return
-	var forward := -global_transform.basis.z
-	var target := global_position + forward * (2.2 if simple_build else 4.0)
-	target.x = snappedf(target.x, 2.0)
-	target.z = snappedf(target.z, 2.0)
-	target.y = snappedf(maxf(target.y, 0.0), 1.5)
 	var piece := BuildPiece.new()
 	get_tree().current_scene.add_child(piece)
-	piece.global_position = target
-	piece.rotation.y = snappedf(rotation.y + build_rotation, PI * 0.5)
-	piece.setup(selected_piece, build_materials[selected_material], get_instance_id())
-	piece.health = {"wood":150.0, "stone":300.0, "metal":500.0}[selected_material]
+	piece.global_transform = preview_transform
+	piece.setup(selected_piece, build_materials[selected_material], get_instance_id(), selected_material)
+	if simple_build and selected_piece == "ramp" and Input.is_action_pressed("sprint"):
+		_place_companion_wall(preview_transform)
 	stats_changed.emit()
+
+func _place_companion_wall(base_transform: Transform3D) -> void:
+	if not inventory.spend_resource(selected_material, 10): return
+	var wall := BuildPiece.new()
+	get_tree().current_scene.add_child(wall)
+	wall.global_transform = base_transform.translated_local(Vector3(0, 0, -2.0))
+	wall.setup("wall", build_materials[selected_material], get_instance_id(), selected_material)
 
 func _edit_target() -> void:
 	var origin := camera.global_position
 	var query := PhysicsRayQueryParameters3D.create(origin, origin + -camera.global_transform.basis.z * 10.0)
 	query.exclude = [self]
+	query.collision_mask = 4
 	var hit := get_world_3d().direct_space_state.intersect_ray(query)
 	if hit and hit.collider is BuildPiece and int(hit.collider.owner_id) == get_instance_id():
-		hit.collider.cycle_edit(simple_edit)
+		if simple_edit:
+			hit.collider.simple_edit_from_local_hit(hit.collider.to_local(hit.position))
+		else:
+			hit.collider.cycle_edit(false)
 
 func collect_loot(item: Dictionary) -> bool:
 	match item.get("kind", ""):
@@ -200,6 +262,7 @@ func apply_damage(amount: float, _source = null) -> void:
 	stats_changed.emit()
 	if health <= 0.0:
 		eliminated.emit()
+		if is_instance_valid(build_preview): build_preview.queue_free()
 		queue_free()
 
 func _inventory_changed() -> void:
