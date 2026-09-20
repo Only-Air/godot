@@ -1,10 +1,10 @@
-; 原创离线战术大逃杀（Godot 4.8）
+; 原创离线战术大逃杀（Godot 4.5 stable 兼容）
 config_version=5
 
 [application]
 config/name="Aegis Royale Prototype"
 run/main_scene="res://main.tscn"
-config/features=PackedStringArray("4.8", "GL Compatibility")
+config/features=PackedStringArray("4.5", "GL Compatibility")
 
 [display]
 window/size/viewport_width=1280
