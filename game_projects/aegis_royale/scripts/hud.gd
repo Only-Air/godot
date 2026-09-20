@@ -48,11 +48,11 @@ func _build_ui() -> void:
 	help_panel = ColorRect.new()
 	help_panel.color = Color(0.02, 0.04, 0.08, 0.72)
 	help_panel.position = Vector2(18, 18)
-	help_panel.size = Vector2(390, 184)
+	help_panel.size = Vector2(410, 202)
 	add_child(help_panel)
 	var help := Label.new()
 	help.position = Vector2(12, 9)
-	help.text = "WASD 移动 / Shift 冲刺 / 空格跳跃\n左键射击、使用或建造　R 换弹　E 搜索\nQ 战斗/建造　1-5 物品槽，建造时 1-4\nF 编辑己方结构　G 旋转　V 简易模式\n空物品槽左键可采集场景材料\n建造预览：蓝色可放置，红色不可放置"
+	help.text = "WASD 移动 / Shift 冲刺 / 空格跳跃\n左键射击、使用或建造　R 换弹　E 搜索\nQ 战斗/建造　1-5 物品槽，建造时 1-4\nF 编辑己方结构　G 旋转　V 简易模式\nZ 循环木材/石材/金属\n空物品槽左键可采集场景材料\n建造预览：蓝色可放置，红色不可放置"
 	help_panel.add_child(help)
 	_refresh()
 
@@ -65,6 +65,7 @@ func _refresh() -> void:
 	if not is_instance_valid(player): return
 	var mode := "建造" if player.build_mode else "战斗"
 	var simple := "简易：开" if player.simple_build else "简易：关"
+	var material_name := {"wood":"木材", "stone":"石材", "metal":"金属"}.get(player.selected_material, "木材")
 	var selected := player.inventory.selected()
 	var item_text := "采集工具"
 	var ammo_text := ""
@@ -73,7 +74,7 @@ func _refresh() -> void:
 		ammo_text = "　弹药 %d/%d" % [int(selected.loaded), int(player.inventory.ammo[selected.ammo])]
 	elif selected.get("kind", "") == "consumable":
 		item_text = "%s ×%d" % [selected.name, int(selected.quantity)]
-	stats_label.text = "生命 %.0f　护盾 %.0f　%s%s\n木 %d　石 %d　金属 %d　%s　%s" % [player.health, player.shield, item_text, ammo_text, int(player.inventory.resources.wood), int(player.inventory.resources.stone), int(player.inventory.resources.metal), mode, simple]
+	stats_label.text = "生命 %.0f　护盾 %.0f　%s%s\n木 %d　石 %d　金属 %d　%s　%s　建材:%s" % [player.health, player.shield, item_text, ammo_text, int(player.inventory.resources.wood), int(player.inventory.resources.stone), int(player.inventory.resources.metal), mode, simple, material_name]
 	var slot_parts: Array[String] = []
 	for i in player.inventory.slots.size():
 		var slot := player.inventory.slots[i]
