@@ -175,7 +175,7 @@ func _shoot(distance: float) -> void:
 
 func _build_cover(enemy_direction: Vector3) -> void:
 	var piece := BuildPiece.new()
-	get_parent().add_child(piece)
+	get_tree().root.add_child(piece)
 	piece.global_position = _snap_build(global_position + enemy_direction * 1.8)
 	piece.rotation.y = atan2(enemy_direction.x, enemy_direction.z)
 	piece.setup("wall", build_material, get_instance_id(), "wood")
@@ -185,7 +185,7 @@ func _build_cover(enemy_direction: Vector3) -> void:
 func _build_ramp_push(enemy_direction: Vector3) -> void:
 	for type in ["wall", "ramp"]:
 		var piece := BuildPiece.new()
-		get_parent().add_child(piece)
+		get_tree().root.add_child(piece)
 		piece.global_position = _snap_build(global_position + enemy_direction * (1.6 if type == "wall" else 3.2))
 		piece.rotation.y = atan2(enemy_direction.x, enemy_direction.z)
 		piece.setup(type, build_material, get_instance_id(), "wood")
@@ -195,7 +195,7 @@ func _build_ramp_push(enemy_direction: Vector3) -> void:
 func _build_defensive_box() -> void:
 	for direction in [Vector3.FORWARD, Vector3.BACK, Vector3.LEFT, Vector3.RIGHT]:
 		var piece := BuildPiece.new()
-		get_parent().add_child(piece)
+		get_tree().root.add_child(piece)
 		piece.global_position = _snap_build(global_position + direction * 1.8)
 		piece.rotation.y = atan2(direction.x, direction.z)
 		piece.setup("wall", build_material, get_instance_id(), "wood")
