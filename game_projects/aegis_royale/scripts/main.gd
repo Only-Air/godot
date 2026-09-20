@@ -2,6 +2,7 @@ extends Node3D
 
 var player: RoyalePlayer
 var storm: StormController
+var map_generator: IslandMapGenerator
 var lobby_layer: CanvasLayer
 var world_started := false
 
@@ -27,7 +28,7 @@ func _show_lobby() -> void:
 	subtitle.add_theme_font_size_override("font_size", 22)
 	background.add_child(subtitle)
 	var feature := Label.new()
-	feature.text = "落地搜刮与五槽物品栏\n三种材料采集与即时建造\n动态风暴和主题兴趣点\n普通 / 简易建造与编辑\n会转点、搭建掩体和评估交战距离的 AI"
+	feature.text = "落地搜刮与五槽物品栏\n三种材料采集与即时建造\n中央湖、河网与九个原创兴趣点\n普通 / 简易建造与编辑\n会搜刮、转点、治疗、搭建掩体和推进的 AI"
 	feature.position = Vector2(75, 230)
 	feature.add_theme_font_size_override("font_size", 24)
 	background.add_child(feature)
@@ -48,7 +49,7 @@ func _show_lobby() -> void:
 func _show_settings() -> void:
 	var popup := AcceptDialog.new()
 	popup.title = "离线设置"
-	popup.dialog_text = "画面：兼容渲染器\n比赛：15 名战术 AI\n建造：比赛中按 V 切换简易模式\n辅助功能：高对比 HUD 已启用\n联网功能：关闭（完全离线）"
+	popup.dialog_text = "画面：兼容渲染器\n比赛：31 名战术 AI\n建造：比赛中按 V 切换简易模式\n辅助功能：高对比 HUD 已启用\n联网功能：关闭（完全离线）"
 	popup.size = Vector2i(480, 300)
 	lobby_layer.add_child(popup)
 	popup.popup_centered()
@@ -74,96 +75,24 @@ func _create_world() -> void:
 	sun.light_energy = 1.2
 	sun.shadow_enabled = true
 	add_child(sun)
-	_create_island()
-	player = RoyalePlayer.new()
-	player.position = Vector3(0, 2, 36)
-	add_child(player)
+	map_generator = IslandMapGenerator.new()
+	add_child(map_generator)
+	map_generator.generate()
 	storm = StormController.new()
 	add_child(storm)
-	for i in 15:
+	player = RoyalePlayer.new()
+	player.position = _spawn_near_poi(0)
+	add_child(player)
+	for i in 31:
 		var bot := TacticalBot.new()
-		bot.position = Vector3(randf_range(-82, 82), 2, randf_range(-82, 82))
+		bot.position = _spawn_near_poi(i + 1)
 		add_child(bot)
-		bot.setup(Color.from_hsv(float(i) / 15.0, 0.6, 0.9), randf_range(0.35, 0.9))
+		bot.setup(Color.from_hsv(float(i) / 31.0, 0.6, 0.9), randf_range(0.28, 0.94))
 	var hud := RoyaleHUD.new()
 	add_child(hud)
 	hud.setup(player, storm)
 
-func _create_island() -> void:
-	var ground := StaticBody3D.new()
-	ground.collision_layer = 1
-	ground.collision_mask = 2
-	add_child(ground)
-	var mesh := MeshInstance3D.new()
-	var cylinder := CylinderMesh.new()
-	cylinder.top_radius = 112.0
-	cylinder.bottom_radius = 118.0
-	cylinder.height = 3.0
-	cylinder.radial_segments = 64
-	mesh.mesh = cylinder
-	mesh.position.y = -1.5
-	var ground_mat := StandardMaterial3D.new()
-	ground_mat.albedo_color = Color("4e8b55")
-	ground_mat.roughness = 1.0
-	mesh.material_override = ground_mat
-	ground.add_child(mesh)
-	var collider := CollisionShape3D.new()
-	var shape := CylinderShape3D.new()
-	shape.radius = 112.0
-	shape.height = 3.0
-	collider.shape = shape
-	collider.position.y = -1.5
-	ground.add_child(collider)
-	_create_central_hub()
-	for i in 34:
-		_create_landmark(Vector3(randf_range(-94, 94), 0, randf_range(-94, 94)), i)
-	for i in 42:
-		_create_harvest_prop(Vector3(randf_range(-100, 100), 0, randf_range(-100, 100)), i)
-	for i in 22:
-		_create_loot_container(Vector3(randf_range(-94, 94), 0, randf_range(-94, 94)), i % 7 == 0)
-	for i in 28:
-		_spawn_floor_loot(Vector3(randf_range(-98, 98), 0.7, randf_range(-98, 98)))
-
-func _create_central_hub() -> void:
-	for i in 8:
-		var angle := TAU * float(i) / 8.0
-		_create_landmark(Vector3(cos(angle) * 17.0, 0, sin(angle) * 17.0), 100 + i)
-	_create_loot_container(Vector3(0, 0, 0), true)
-	_create_loot_container(Vector3(4, 0, 0), true)
-	_create_loot_container(Vector3(-4, 0, 0), true)
-
-func _create_landmark(pos: Vector3, index: int) -> void:
-	if Vector2(pos.x, pos.z).length() > 101.0: return
-	var body := HarvestProp.new()
-	body.position = pos
-	add_child(body)
-	var size := Vector3(randf_range(5, 12), randf_range(3, 10), randf_range(5, 12))
-	body.setup("stone", size, [Color("d67c5c"), Color("d4bd67"), Color("6da4a8"), Color("876ba8")][index % 4])
-
-func _create_harvest_prop(pos: Vector3, index: int) -> void:
-	if Vector2(pos.x, pos.z).length() > 102.0: return
-	var prop := HarvestProp.new()
-	prop.position = pos
-	add_child(prop)
-	if index % 3 == 0:
-		prop.setup("wood", Vector3(1.2, randf_range(4.0, 7.5), 1.2), Color("4b713f"))
-	elif index % 3 == 1:
-		prop.setup("stone", Vector3(randf_range(1.5, 3.5), randf_range(1.2, 2.8), randf_range(1.5, 3.5)), Color("777e83"))
-	else:
-		prop.setup("metal", Vector3(randf_range(2.0, 4.5), randf_range(1.0, 2.2), randf_range(1.5, 3.0)), Color("587180"))
-
-func _create_loot_container(pos: Vector3, high_tier: bool) -> void:
-	if Vector2(pos.x, pos.z).length() > 104.0: return
-	var container := LootContainer.new()
-	container.position = pos
-	add_child(container)
-	container.setup(1 if high_tier else 0)
-
-func _spawn_floor_loot(pos: Vector3) -> void:
-	if Vector2(pos.x, pos.z).length() > 104.0: return
-	var pickup := LootPickup.new()
-	pickup.position = pos
-	add_child(pickup)
-	var item := ItemDatabase.random_weapon(2)
-	item.kind = "weapon"
-	pickup.setup(item)
+func _spawn_near_poi(index: int) -> Vector3:
+	var poi: Dictionary = map_generator.poi_data[index % map_generator.poi_data.size()]
+	var center: Vector3 = poi.position
+	return center + Vector3(randf_range(-12, 12), 2.0, randf_range(-12, 12))
