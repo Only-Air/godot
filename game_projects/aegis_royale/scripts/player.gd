@@ -5,26 +5,26 @@ signal stats_changed
 signal eliminated
 signal hit_confirmed(damage: float, critical: bool)
 
-var health := 100.0
-var shield := 0.0
-var inventory := RoyaleInventory.new()
-var build_mode := false
-var simple_build := false
-var simple_edit := false
-var selected_piece := "wall"
-var selected_material := "wood"
-var build_rotation := 0.0
-var last_action_time := -10.0
-var gravity := 22.0
+var health: float = 100.0
+var shield: float = 0.0
+var inventory: RoyaleInventory = RoyaleInventory.new()
+var build_mode: bool = false
+var simple_build: bool = false
+var simple_edit: bool = false
+var selected_piece: String = "wall"
+var selected_material: String = "wood"
+var build_rotation: float = 0.0
+var last_action_time: float = -10.0
+var gravity: float = 22.0
 var camera: Camera3D
 var pivot: Node3D
-var build_materials := {}
+var build_materials: Dictionary = {}
 var build_preview: BuildPreview
-var preview_valid := false
-var preview_transform := Transform3D.IDENTITY
-var recoil_pitch := 0.0
-var bloom_heat := 0.0
-var current_spread_pixels := 4.0
+var preview_valid: bool = false
+var preview_transform: Transform3D = Transform3D.IDENTITY
+var recoil_pitch: float = 0.0
+var bloom_heat: float = 0.0
+var current_spread_pixels: float = 4.0
 
 func _ready() -> void:
 	add_to_group("combatants")
@@ -41,20 +41,20 @@ func _ready() -> void:
 	build_preview.visible = false
 
 func _create_body() -> void:
-	var collider := CollisionShape3D.new()
-	var capsule := CapsuleShape3D.new()
+	var collider: CollisionShape3D = CollisionShape3D.new()
+	var capsule: CapsuleShape3D = CapsuleShape3D.new()
 	capsule.radius = 0.45
 	capsule.height = 1.8
 	collider.shape = capsule
 	collider.position.y = 0.9
 	add_child(collider)
-	var mesh := MeshInstance3D.new()
-	var capsule_mesh := CapsuleMesh.new()
+	var mesh: MeshInstance3D = MeshInstance3D.new()
+	var capsule_mesh: CapsuleMesh = CapsuleMesh.new()
 	capsule_mesh.radius = 0.45
 	capsule_mesh.height = 1.8
 	mesh.mesh = capsule_mesh
 	mesh.position.y = 0.9
-	var mat := StandardMaterial3D.new()
+	var mat: StandardMaterial3D = StandardMaterial3D.new()
 	mat.albedo_color = Color("46a7ff")
 	mesh.material_override = mat
 	add_child(mesh)
@@ -67,17 +67,17 @@ func _create_body() -> void:
 	pivot.add_child(camera)
 
 func _create_build_materials() -> void:
-	for type in ["wood", "stone", "metal"]:
-		var mat := StandardMaterial3D.new()
-		mat.albedo_color = {"wood":Color("b98958"), "stone":Color("9299a2"), "metal":Color("6e91a5")}[type]
+	for material_type: String in ["wood", "stone", "metal"]:
+		var mat: StandardMaterial3D = StandardMaterial3D.new()
+		mat.albedo_color = {"wood":Color("b98958"), "stone":Color("9299a2"), "metal":Color("6e91a5")}[material_type]
 		mat.roughness = 0.82
-		build_materials[type] = mat
+		build_materials[material_type] = mat
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
-		var sensitivity := float(get_meta("mouse_sensitivity", 1.0))
+		var sensitivity: float = float(get_meta("mouse_sensitivity", 1.0))
 		rotate_y(-event.relative.x * 0.0025 * sensitivity)
-		pivot.rotation.x = clamp(pivot.rotation.x - event.relative.y * 0.0025 * sensitivity, -1.15, 0.75)
+		pivot.rotation.x = clampf(pivot.rotation.x - event.relative.y * 0.0025 * sensitivity, -1.15, 0.75)
 	if event.is_action_pressed("build_toggle"):
 		build_mode = not build_mode
 		if is_instance_valid(build_preview): build_preview.visible = build_mode
@@ -109,29 +109,29 @@ func _number_action(slot: int, piece: String) -> void:
 func _physics_process(delta: float) -> void:
 	if not is_on_floor(): velocity.y -= gravity * delta
 	if Input.is_action_just_pressed("jump") and is_on_floor(): velocity.y = 8.2
-	var input := Input.get_vector("move_left", "move_right", "move_forward", "move_back")
-	var direction := (transform.basis * Vector3(input.x, 0, input.y)).normalized()
-	var speed := 10.5 if Input.is_action_pressed("sprint") else 6.8
+	var input: Vector2 = Input.get_vector("move_left", "move_right", "move_forward", "move_back")
+	var direction: Vector3 = (transform.basis * Vector3(input.x, 0, input.y)).normalized()
+	var speed: float = 10.5 if Input.is_action_pressed("sprint") else 6.8
 	velocity.x = move_toward(velocity.x, direction.x * speed, 35.0 * delta)
 	velocity.z = move_toward(velocity.z, direction.z * speed, 35.0 * delta)
 	move_and_slide()
 	_update_weapon_recovery(delta)
 	if build_mode: _update_build_preview()
 	if Input.is_action_pressed("fire") and not build_mode:
-		var item := inventory.selected()
+		var item: Dictionary = inventory.selected()
 		if item.get("kind", "") == "weapon" and float(item.fire_rate) > 2.0: _fire(item)
 
 func _update_weapon_recovery(delta: float) -> void:
 	bloom_heat = move_toward(bloom_heat, 0.0, delta * 2.6)
-	var recovery := minf(recoil_pitch, delta * 0.85)
-	pivot.rotation.x = clamp(pivot.rotation.x + recovery, -1.15, 0.75)
+	var recovery: float = minf(recoil_pitch, delta * 0.85)
+	pivot.rotation.x = clampf(pivot.rotation.x + recovery, -1.15, 0.75)
 	recoil_pitch -= recovery
-	var item := inventory.selected()
+	var item: Dictionary = inventory.selected()
 	if item.get("kind", "") != "weapon":
 		current_spread_pixels = 4.0
 		return
-	var move_factor := float(item.get("move_spread", 1.0)) if Vector2(velocity.x, velocity.z).length() > 1.0 else 1.0
-	var aim_factor := 0.55 if Input.is_action_pressed("aim") else 1.0
+	var move_factor: float = float(item.get("move_spread", 1.0)) if Vector2(velocity.x, velocity.z).length() > 1.0 else 1.0
+	var aim_factor: float = 0.55 if Input.is_action_pressed("aim") else 1.0
 	current_spread_pixels = maxf(2.0, float(item.spread) * 650.0 * move_factor * aim_factor * (1.0 + bloom_heat))
 	camera.position.z = lerpf(camera.position.z, 3.2 if Input.is_action_pressed("aim") else 4.5, delta * 10.0)
 
@@ -144,13 +144,14 @@ func _update_build_preview() -> void:
 	build_preview.visible = true
 
 func _calculate_build_transform() -> Transform3D:
-	var ray_origin := camera.global_position
-	var ray_end := ray_origin + -camera.global_transform.basis.z * (5.0 if simple_build else 8.0)
-	var query := PhysicsRayQueryParameters3D.create(ray_origin, ray_end)
+	var ray_origin: Vector3 = camera.global_position
+	var ray_end: Vector3 = ray_origin + -camera.global_transform.basis.z * (5.0 if simple_build else 8.0)
+	var query: PhysicsRayQueryParameters3D = PhysicsRayQueryParameters3D.create(ray_origin, ray_end)
 	query.exclude = [self]
 	query.collision_mask = 1 | 4
-	var hit := get_world_3d().direct_space_state.intersect_ray(query)
-	var target := hit.position if hit else ray_end
+	var hit: Dictionary = get_world_3d().direct_space_state.intersect_ray(query)
+	var target: Vector3 = ray_end
+	if not hit.is_empty(): target = hit["position"] as Vector3
 	if simple_build: target = global_position + -global_transform.basis.z * 2.4
 	target.x = snappedf(target.x, 4.0)
 	target.z = snappedf(target.z, 4.0)
@@ -159,25 +160,25 @@ func _calculate_build_transform() -> Transform3D:
 
 func _can_place_build(candidate: Transform3D) -> bool:
 	if int(inventory.resources.get(selected_material, 0)) < 10: return false
-	var position_to_test := candidate.origin
+	var position_to_test: Vector3 = candidate.origin
 	if position_to_test.distance_to(global_position) > 10.0: return false
-	for existing in get_tree().get_nodes_in_group("build_pieces"):
+	for existing: Node in get_tree().get_nodes_in_group("build_pieces"):
 		if is_instance_valid(existing) and existing.global_position.distance_to(position_to_test) < 0.45 and existing.piece_type == selected_piece: return false
-	var supported := position_to_test.y <= 0.25
+	var supported: bool = position_to_test.y <= 0.25
 	if not supported:
-		var down_query := PhysicsRayQueryParameters3D.create(position_to_test + Vector3.UP * 0.5, position_to_test + Vector3.DOWN * 1.2)
+		var down_query: PhysicsRayQueryParameters3D = PhysicsRayQueryParameters3D.create(position_to_test + Vector3.UP * 0.5, position_to_test + Vector3.DOWN * 1.2)
 		down_query.exclude = [self]
 		down_query.collision_mask = 1 | 4
 		supported = not get_world_3d().direct_space_state.intersect_ray(down_query).is_empty()
 	if not supported:
-		for existing in get_tree().get_nodes_in_group("build_pieces"):
+		for existing: Node in get_tree().get_nodes_in_group("build_pieces"):
 			if is_instance_valid(existing) and existing.global_position.distance_to(position_to_test) <= 4.2:
 				supported = true
 				break
 	return supported
 
 func _use_selected() -> void:
-	var item := inventory.selected()
+	var item: Dictionary = inventory.selected()
 	if item.is_empty(): _harvest_swing()
 	elif item.get("kind", "") == "weapon": _fire(item)
 	elif item.get("kind", "") == "consumable":
@@ -185,7 +186,7 @@ func _use_selected() -> void:
 		stats_changed.emit()
 
 func _fire(weapon: Dictionary) -> void:
-	var now := Time.get_ticks_msec() / 1000.0
+	var now: float = Time.get_ticks_msec() / 1000.0
 	if now - last_action_time < 1.0 / float(weapon.fire_rate) or int(weapon.loaded) <= 0: return
 	last_action_time = now
 	weapon.loaded -= 1
@@ -194,62 +195,69 @@ func _fire(weapon: Dictionary) -> void:
 		_fire_projectile(weapon)
 		stats_changed.emit()
 		return
-	var pellets := int(weapon.get("pellets", 1))
-	for i in pellets:
-		var center := camera.get_viewport().get_visible_rect().size * 0.5
-		var point := center + Vector2(randf_range(-current_spread_pixels, current_spread_pixels), randf_range(-current_spread_pixels, current_spread_pixels))
-		var origin := camera.project_ray_origin(point)
-		var end := origin + camera.project_ray_normal(point) * float(weapon.range)
-		var query := PhysicsRayQueryParameters3D.create(origin, end)
+	var pellets: int = int(weapon.get("pellets", 1))
+	for _pellet: int in pellets:
+		var center: Vector2 = camera.get_viewport().get_visible_rect().size * 0.5
+		var point: Vector2 = center + Vector2(randf_range(-current_spread_pixels, current_spread_pixels), randf_range(-current_spread_pixels, current_spread_pixels))
+		var origin: Vector3 = camera.project_ray_origin(point)
+		var end: Vector3 = origin + camera.project_ray_normal(point) * float(weapon.range)
+		var query: PhysicsRayQueryParameters3D = PhysicsRayQueryParameters3D.create(origin, end)
 		query.exclude = [self]
-		var hit := get_world_3d().direct_space_state.intersect_ray(query)
-		if hit and hit.collider.has_method("apply_damage"):
-			var damage := ItemDatabase.damage_at_distance(weapon, origin.distance_to(hit.position))
-			var critical := false
-			if hit.collider is RoyalePlayer or hit.collider is TacticalBot:
-				critical = hit.collider.to_local(hit.position).y > 1.35
-				if critical: damage *= 1.75
-			if hit.collider is BuildPiece: damage *= float(weapon.get("structure_mult", 1.0))
-			hit.collider.apply_damage(damage, self)
-			hit_confirmed.emit(damage, critical)
+		var hit: Dictionary = get_world_3d().direct_space_state.intersect_ray(query)
+		if not hit.is_empty():
+			var collider: Object = hit["collider"]
+			if collider.has_method("apply_damage"):
+				var hit_position: Vector3 = hit["position"] as Vector3
+				var damage: float = ItemDatabase.damage_at_distance(weapon, origin.distance_to(hit_position))
+				var critical: bool = false
+				if collider is RoyalePlayer or collider is TacticalBot:
+					critical = collider.to_local(hit_position).y > 1.35
+					if critical: damage *= 1.75
+				if collider is BuildPiece: damage *= float(weapon.get("structure_mult", 1.0))
+				collider.apply_damage(damage, self)
+				hit_confirmed.emit(damage, critical)
 	stats_changed.emit()
 
 func _apply_recoil(weapon: Dictionary) -> void:
-	var amount := float(weapon.get("recoil", 0.01))
-	var applied := amount * (0.65 if Input.is_action_pressed("aim") else 1.0)
-	pivot.rotation.x = clamp(pivot.rotation.x - applied, -1.15, 0.75)
+	var amount: float = float(weapon.get("recoil", 0.01))
+	var applied: float = amount * (0.65 if Input.is_action_pressed("aim") else 1.0)
+	pivot.rotation.x = clampf(pivot.rotation.x - applied, -1.15, 0.75)
 	recoil_pitch += applied
 	rotate_y(randf_range(-applied * 0.25, applied * 0.25))
 	bloom_heat = minf(1.8, bloom_heat + 0.18)
 
 func _fire_projectile(weapon: Dictionary) -> void:
-	var projectile := CombatProjectile.new()
+	var projectile: CombatProjectile = CombatProjectile.new()
 	get_tree().current_scene.add_child(projectile)
-	var center := camera.get_viewport().get_visible_rect().size * 0.5
-	var direction := camera.project_ray_normal(center)
+	var center: Vector2 = camera.get_viewport().get_visible_rect().size * 0.5
+	var direction: Vector3 = camera.project_ray_normal(center)
 	projectile.setup(camera.global_position + direction * 1.2, direction, self, weapon)
 
 func _harvest_swing() -> void:
-	var now := Time.get_ticks_msec() / 1000.0
+	var now: float = Time.get_ticks_msec() / 1000.0
 	if now - last_action_time < 0.72: return
 	last_action_time = now
-	var origin := camera.global_position
-	var query := PhysicsRayQueryParameters3D.create(origin, origin + -camera.global_transform.basis.z * 4.0)
+	var origin: Vector3 = camera.global_position
+	var query: PhysicsRayQueryParameters3D = PhysicsRayQueryParameters3D.create(origin, origin + -camera.global_transform.basis.z * 4.0)
 	query.exclude = [self]
-	var hit := get_world_3d().direct_space_state.intersect_ray(query)
-	if hit and hit.collider.has_method("harvest"): hit.collider.harvest(50.0, self)
+	var hit: Dictionary = get_world_3d().direct_space_state.intersect_ray(query)
+	if not hit.is_empty():
+		var collider: Object = hit["collider"]
+		if collider.has_method("harvest"): collider.harvest(50.0, self)
 
 func _interact() -> void:
-	var origin := camera.global_position
-	var query := PhysicsRayQueryParameters3D.create(origin, origin + -camera.global_transform.basis.z * 4.2)
+	var origin: Vector3 = camera.global_position
+	var query: PhysicsRayQueryParameters3D = PhysicsRayQueryParameters3D.create(origin, origin + -camera.global_transform.basis.z * 4.2)
 	query.exclude = [self]
-	var hit := get_world_3d().direct_space_state.intersect_ray(query)
-	if hit and hit.collider.has_method("interact"): hit.collider.interact(self)
+	var hit: Dictionary = get_world_3d().direct_space_state.intersect_ray(query)
+	if not hit.is_empty():
+		var collider: Object = hit["collider"]
+		if collider.has_method("interact"): collider.interact(self)
 
 func _place_build() -> void:
 	_update_build_preview()
 	if not preview_valid or not inventory.spend_resource(selected_material, 10): return
-	var piece := BuildPiece.new()
+	var piece: BuildPiece = BuildPiece.new()
 	get_tree().current_scene.add_child(piece)
 	piece.global_transform = preview_transform
 	piece.setup(selected_piece, build_materials[selected_material], get_instance_id(), selected_material)
@@ -258,20 +266,22 @@ func _place_build() -> void:
 
 func _place_companion_wall(base_transform: Transform3D) -> void:
 	if not inventory.spend_resource(selected_material, 10): return
-	var wall := BuildPiece.new()
+	var wall: BuildPiece = BuildPiece.new()
 	get_tree().current_scene.add_child(wall)
 	wall.global_transform = base_transform.translated_local(Vector3(0, 0, -2.0))
 	wall.setup("wall", build_materials[selected_material], get_instance_id(), selected_material)
 
 func _edit_target() -> void:
-	var origin := camera.global_position
-	var query := PhysicsRayQueryParameters3D.create(origin, origin + -camera.global_transform.basis.z * 10.0)
+	var origin: Vector3 = camera.global_position
+	var query: PhysicsRayQueryParameters3D = PhysicsRayQueryParameters3D.create(origin, origin + -camera.global_transform.basis.z * 10.0)
 	query.exclude = [self]
 	query.collision_mask = 4
-	var hit := get_world_3d().direct_space_state.intersect_ray(query)
-	if hit and hit.collider is BuildPiece and int(hit.collider.owner_id) == get_instance_id():
-		if simple_edit: hit.collider.simple_edit_from_local_hit(hit.collider.to_local(hit.position))
-		else: hit.collider.cycle_edit(false)
+	var hit: Dictionary = get_world_3d().direct_space_state.intersect_ray(query)
+	if not hit.is_empty():
+		var collider: Object = hit["collider"]
+		if collider is BuildPiece and int(collider.owner_id) == get_instance_id():
+			if simple_edit: collider.simple_edit_from_local_hit(collider.to_local(hit["position"] as Vector3))
+			else: collider.cycle_edit(false)
 
 func collect_loot(item: Dictionary) -> bool:
 	match item.get("kind", ""):
@@ -288,8 +298,8 @@ func collect_loot(item: Dictionary) -> bool:
 func receive_resource(type: String, amount: int) -> void:
 	inventory.add_resource(type, amount)
 
-func apply_damage(amount: float, _source = null) -> void:
-	var absorbed := minf(shield, amount)
+func apply_damage(amount: float, _source: Node = null) -> void:
+	var absorbed: float = minf(shield, amount)
 	shield -= absorbed
 	health -= amount - absorbed
 	stats_changed.emit()
