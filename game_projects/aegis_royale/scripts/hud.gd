@@ -12,7 +12,7 @@ var drop_label: Label
 var crosshair: Label
 var hit_marker: Label
 var damage_label: Label
-var hit_timer := 0.0
+var hit_timer: float = 0.0
 var help_panel: ColorRect
 
 func setup(controlled_player: RoyalePlayer, storm_controller: StormController, drop: DropController = null) -> void:
@@ -64,7 +64,7 @@ func _build_ui() -> void:
 	help_panel.position = Vector2(18, 18)
 	help_panel.size = Vector2(410, 220)
 	add_child(help_panel)
-	var help := Label.new()
+	var help: Label = Label.new()
 	help.position = Vector2(12, 9)
 	help.text = "WASD 移动 / Shift 冲刺 / 空格跳跃\n左键射击、使用或建造　右键瞄准　R 换弹\nE 搜索　Q 战斗/建造　1-5 物品槽\n建造时 1-4 选结构　F 编辑　G 旋转\nV 简易模式　Z 循环木/石/金属\n空物品槽左键采集场景材料\n建造预览：蓝色可放置，红色不可放置"
 	help_panel.add_child(help)
@@ -75,7 +75,7 @@ func _process(delta: float) -> void:
 	alive_label.text = "存活 %d" % get_tree().get_nodes_in_group("combatants").size()
 	drop_label.text = drop_controller.status_text() if is_instance_valid(drop_controller) else ""
 	if is_instance_valid(player):
-		var offset := clampf(player.current_spread_pixels * 0.18, 0.0, 16.0)
+		var offset: float = clampf(player.current_spread_pixels * 0.18, 0.0, 16.0)
 		crosshair.text = "└　┘\n\n┌　┐"
 		crosshair.position = Vector2(612 - offset, 326 - offset)
 	if hit_timer > 0.0:
@@ -89,18 +89,19 @@ func _on_hit_confirmed(damage: float, critical: bool) -> void:
 	hit_marker.visible = true
 	damage_label.visible = true
 	damage_label.text = "%d" % roundi(damage)
-	var color := Color("ffd447") if critical else Color.WHITE
+	var color: Color = Color("ffd447") if critical else Color.WHITE
 	hit_marker.modulate = color
 	damage_label.modulate = color
 
 func _refresh() -> void:
 	if not is_instance_valid(player): return
-	var mode := "建造" if player.build_mode else "战斗"
-	var simple := "简易：开" if player.simple_build else "简易：关"
-	var material_name := {"wood":"木材", "stone":"石材", "metal":"金属"}.get(player.selected_material, "木材")
-	var selected := player.inventory.selected()
-	var item_text := "采集工具"
-	var ammo_text := ""
+	var mode: String = "建造" if player.build_mode else "战斗"
+	var simple: String = "简易：开" if player.simple_build else "简易：关"
+	var material_names: Dictionary = {"wood":"木材", "stone":"石材", "metal":"金属"}
+	var material_name: String = str(material_names.get(player.selected_material, "木材"))
+	var selected: Dictionary = player.inventory.selected()
+	var item_text: String = "采集工具"
+	var ammo_text: String = ""
 	if selected.get("kind", "") == "weapon":
 		item_text = "%s（%s）" % [selected.name, ItemDatabase.RARITY[selected.rarity].label]
 		ammo_text = "　弹药 %d/%d" % [int(selected.loaded), int(player.inventory.ammo[selected.ammo])]
@@ -108,10 +109,10 @@ func _refresh() -> void:
 		item_text = "%s ×%d" % [selected.name, int(selected.quantity)]
 	stats_label.text = "生命 %.0f　护盾 %.0f　%s%s\n木 %d　石 %d　金属 %d　%s　%s　建材:%s" % [player.health, player.shield, item_text, ammo_text, int(player.inventory.resources.wood), int(player.inventory.resources.stone), int(player.inventory.resources.metal), mode, simple, material_name]
 	var slot_parts: Array[String] = []
-	for i in player.inventory.slots.size():
-		var slot := player.inventory.slots[i]
-		var label := "空"
-		if not slot.is_empty(): label = slot.get("name", "物品")
-		var marker := ">" if i == player.inventory.selected_slot else " "
+	for i: int in player.inventory.slots.size():
+		var slot: Dictionary = player.inventory.slots[i]
+		var label: String = "空"
+		if not slot.is_empty(): label = str(slot.get("name", "物品"))
+		var marker: String = ">" if i == player.inventory.selected_slot else " "
 		slot_parts.append("%s%d:%s" % [marker, i + 1, label])
 	inventory_label.text = "　".join(slot_parts)
