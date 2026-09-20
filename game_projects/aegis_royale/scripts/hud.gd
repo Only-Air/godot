@@ -3,16 +3,19 @@ extends CanvasLayer
 
 var player: RoyalePlayer
 var storm: StormController
+var drop_controller: DropController
 var stats_label: Label
 var storm_label: Label
 var alive_label: Label
 var inventory_label: Label
+var drop_label: Label
 var crosshair: Label
 var help_panel: ColorRect
 
-func setup(controlled_player: RoyalePlayer, storm_controller: StormController) -> void:
+func setup(controlled_player: RoyalePlayer, storm_controller: StormController, drop: DropController = null) -> void:
 	player = controlled_player
 	storm = storm_controller
+	drop_controller = drop
 	_build_ui()
 	player.stats_changed.connect(_refresh)
 
@@ -22,8 +25,8 @@ func _build_ui() -> void:
 	stats_label.add_theme_font_size_override("font_size", 20)
 	add_child(stats_label)
 	inventory_label = Label.new()
-	inventory_label.position = Vector2(470, 642)
-	inventory_label.add_theme_font_size_override("font_size", 18)
+	inventory_label.position = Vector2(420, 642)
+	inventory_label.add_theme_font_size_override("font_size", 17)
 	add_child(inventory_label)
 	storm_label = Label.new()
 	storm_label.position = Vector2(450, 22)
@@ -33,6 +36,10 @@ func _build_ui() -> void:
 	alive_label.position = Vector2(1100, 22)
 	alive_label.add_theme_font_size_override("font_size", 20)
 	add_child(alive_label)
+	drop_label = Label.new()
+	drop_label.position = Vector2(450, 580)
+	drop_label.add_theme_font_size_override("font_size", 23)
+	add_child(drop_label)
 	crosshair = Label.new()
 	crosshair.text = "+"
 	crosshair.position = Vector2(635, 350)
@@ -41,17 +48,18 @@ func _build_ui() -> void:
 	help_panel = ColorRect.new()
 	help_panel.color = Color(0.02, 0.04, 0.08, 0.72)
 	help_panel.position = Vector2(18, 18)
-	help_panel.size = Vector2(380, 184)
+	help_panel.size = Vector2(390, 184)
 	add_child(help_panel)
 	var help := Label.new()
 	help.position = Vector2(12, 9)
-	help.text = "WASD 移动 / Shift 冲刺 / 空格跳跃\n左键射击、使用或建造　R 换弹　E 搜索\nQ 战斗/建造　1-4 物品槽或建造结构\nF 编辑己方结构　G 旋转　V 简易模式\n空物品槽左键可采集场景材料\n靠近发光战利品自动拾取"
+	help.text = "WASD 移动 / Shift 冲刺 / 空格跳跃\n左键射击、使用或建造　R 换弹　E 搜索\nQ 战斗/建造　1-5 物品槽，建造时 1-4\nF 编辑己方结构　G 旋转　V 简易模式\n空物品槽左键可采集场景材料\n建造预览：蓝色可放置，红色不可放置"
 	help_panel.add_child(help)
 	_refresh()
 
 func _process(_delta: float) -> void:
 	if is_instance_valid(storm): storm_label.text = storm.status_text()
 	alive_label.text = "存活 %d" % get_tree().get_nodes_in_group("combatants").size()
+	drop_label.text = drop_controller.status_text() if is_instance_valid(drop_controller) else ""
 
 func _refresh() -> void:
 	if not is_instance_valid(player): return
