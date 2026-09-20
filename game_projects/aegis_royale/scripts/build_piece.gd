@@ -28,6 +28,7 @@ func setup(type: String, material: Material, creator_id: int = 0, resource_type:
 	building_duration = {"wood":0.55, "stone":1.0, "metal":1.55}.get(material_type, 0.7)
 	collision_layer = 4
 	collision_mask = 3
+	add_to_group("build_pieces")
 	mesh_root = Node3D.new()
 	collision_root = Node3D.new()
 	add_child(mesh_root)
