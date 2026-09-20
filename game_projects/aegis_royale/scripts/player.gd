@@ -3,6 +3,7 @@ extends CharacterBody3D
 
 signal stats_changed
 signal eliminated
+signal hit_confirmed(damage: float, critical: bool)
 
 var health := 100.0
 var shield := 0.0
@@ -21,6 +22,9 @@ var build_materials := {}
 var build_preview: BuildPreview
 var preview_valid := false
 var preview_transform := Transform3D.IDENTITY
+var recoil_pitch := 0.0
+var bloom_heat := 0.0
+var current_spread_pixels := 4.0
 
 func _ready() -> void:
 	add_to_group("combatants")
@@ -73,8 +77,6 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		rotate_y(-event.relative.x * 0.0025)
 		pivot.rotation.x = clamp(pivot.rotation.x - event.relative.y * 0.0025, -1.15, 0.75)
-	if event.is_action_pressed("pause"):
-		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE if Input.mouse_mode == Input.MOUSE_MODE_CAPTURED else Input.MOUSE_MODE_CAPTURED
 	if event.is_action_pressed("build_toggle"):
 		build_mode = not build_mode
 		if is_instance_valid(build_preview): build_preview.visible = build_mode
@@ -113,10 +115,25 @@ func _physics_process(delta: float) -> void:
 	velocity.x = move_toward(velocity.x, direction.x * speed, 35.0 * delta)
 	velocity.z = move_toward(velocity.z, direction.z * speed, 35.0 * delta)
 	move_and_slide()
+	_update_weapon_recovery(delta)
 	if build_mode: _update_build_preview()
 	if Input.is_action_pressed("fire") and not build_mode:
 		var item := inventory.selected()
 		if item.get("kind", "") == "weapon" and float(item.fire_rate) > 2.0: _fire(item)
+
+func _update_weapon_recovery(delta: float) -> void:
+	bloom_heat = move_toward(bloom_heat, 0.0, delta * 2.6)
+	var recovery := minf(recoil_pitch, delta * 0.85)
+	pivot.rotation.x = clamp(pivot.rotation.x + recovery, -1.15, 0.75)
+	recoil_pitch -= recovery
+	var item := inventory.selected()
+	if item.get("kind", "") != "weapon":
+		current_spread_pixels = 4.0
+		return
+	var move_factor := float(item.get("move_spread", 1.0)) if Vector2(velocity.x, velocity.z).length() > 1.0 else 1.0
+	var aim_factor := 0.55 if Input.is_action_pressed("aim") else 1.0
+	current_spread_pixels = maxf(2.0, float(item.spread) * 650.0 * move_factor * aim_factor * (1.0 + bloom_heat))
+	camera.position.z = lerpf(camera.position.z, 3.2 if Input.is_action_pressed("aim") else 4.5, delta * 10.0)
 
 func _update_build_preview() -> void:
 	if not is_instance_valid(build_preview): return
@@ -134,8 +151,7 @@ func _calculate_build_transform() -> Transform3D:
 	query.collision_mask = 1 | 4
 	var hit := get_world_3d().direct_space_state.intersect_ray(query)
 	var target := hit.position if hit else ray_end
-	if simple_build:
-		target = global_position + -global_transform.basis.z * 2.4
+	if simple_build: target = global_position + -global_transform.basis.z * 2.4
 	target.x = snappedf(target.x, 4.0)
 	target.z = snappedf(target.z, 4.0)
 	target.y = snappedf(maxf(0.0, target.y), 3.0)
@@ -147,8 +163,7 @@ func _can_place_build(candidate: Transform3D) -> bool:
 	var position_to_test := candidate.origin
 	if position_to_test.distance_to(global_position) > 10.0: return false
 	for existing in get_tree().get_nodes_in_group("build_pieces"):
-		if not is_instance_valid(existing): continue
-		if existing.global_position.distance_to(position_to_test) < 0.45 and existing.piece_type == selected_piece: return false
+		if is_instance_valid(existing) and existing.global_position.distance_to(position_to_test) < 0.45 and existing.piece_type == selected_piece: return false
 	var supported := position_to_test.y <= 0.25
 	if not supported:
 		var down_query := PhysicsRayQueryParameters3D.create(position_to_test + Vector3.UP * 0.5, position_to_test + Vector3.DOWN * 1.2)
@@ -164,10 +179,8 @@ func _can_place_build(candidate: Transform3D) -> bool:
 
 func _use_selected() -> void:
 	var item := inventory.selected()
-	if item.is_empty():
-		_harvest_swing()
-	elif item.get("kind", "") == "weapon":
-		_fire(item)
+	if item.is_empty(): _harvest_swing()
+	elif item.get("kind", "") == "weapon": _fire(item)
 	elif item.get("kind", "") == "consumable":
 		inventory.consume_selected(self)
 		stats_changed.emit()
@@ -177,20 +190,47 @@ func _fire(weapon: Dictionary) -> void:
 	if now - last_action_time < 1.0 / float(weapon.fire_rate) or int(weapon.loaded) <= 0: return
 	last_action_time = now
 	weapon.loaded -= 1
+	_apply_recoil(weapon)
+	if weapon.get("class", "") == "explosive":
+		_fire_projectile(weapon)
+		stats_changed.emit()
+		return
 	var pellets := int(weapon.get("pellets", 1))
 	for i in pellets:
 		var center := camera.get_viewport().get_visible_rect().size * 0.5
-		var spread := float(weapon.spread) * 650.0
-		var point := center + Vector2(randf_range(-spread, spread), randf_range(-spread, spread))
+		var point := center + Vector2(randf_range(-current_spread_pixels, current_spread_pixels), randf_range(-current_spread_pixels, current_spread_pixels))
 		var origin := camera.project_ray_origin(point)
 		var end := origin + camera.project_ray_normal(point) * float(weapon.range)
 		var query := PhysicsRayQueryParameters3D.create(origin, end)
 		query.exclude = [self]
 		var hit := get_world_3d().direct_space_state.intersect_ray(query)
 		if hit and hit.collider.has_method("apply_damage"):
-			var multiplier := float(weapon.get("structure_mult", 1.0)) if hit.collider is BuildPiece else 1.0
-			hit.collider.apply_damage(float(weapon.damage) * multiplier, self)
+			var distance := origin.distance_to(hit.position)
+			var damage := ItemDatabase.damage_at_distance(weapon, distance)
+			var critical := false
+			if hit.collider is RoyalePlayer or hit.collider is TacticalBot:
+				critical = hit.collider.to_local(hit.position).y > 1.35
+				if critical: damage *= 1.75
+			if hit.collider is BuildPiece: damage *= float(weapon.get("structure_mult", 1.0))
+			hit.collider.apply_damage(damage, self)
+			hit_confirmed.emit(damage, critical)
 	stats_changed.emit()
+
+func _apply_recoil(weapon: Dictionary) -> void:
+	var amount := float(weapon.get("recoil", 0.01))
+	var aim_multiplier := 0.65 if Input.is_action_pressed("aim") else 1.0
+	var applied := amount * aim_multiplier
+	pivot.rotation.x = clamp(pivot.rotation.x - applied, -1.15, 0.75)
+	recoil_pitch += applied
+	rotate_y(randf_range(-applied * 0.25, applied * 0.25))
+	bloom_heat = minf(1.8, bloom_heat + 0.18)
+
+func _fire_projectile(weapon: Dictionary) -> void:
+	var projectile := CombatProjectile.new()
+	get_tree().current_scene.add_child(projectile)
+	var center := camera.get_viewport().get_visible_rect().size * 0.5
+	var direction := camera.project_ray_normal(center)
+	projectile.setup(camera.global_position + direction * 1.2, direction, self, weapon)
 
 func _harvest_swing() -> void:
 	var now := Time.get_ticks_msec() / 1000.0
@@ -211,14 +251,12 @@ func _interact() -> void:
 
 func _place_build() -> void:
 	_update_build_preview()
-	if not preview_valid: return
-	if not inventory.spend_resource(selected_material, 10): return
+	if not preview_valid or not inventory.spend_resource(selected_material, 10): return
 	var piece := BuildPiece.new()
 	get_tree().current_scene.add_child(piece)
 	piece.global_transform = preview_transform
 	piece.setup(selected_piece, build_materials[selected_material], get_instance_id(), selected_material)
-	if simple_build and selected_piece == "ramp" and Input.is_action_pressed("sprint"):
-		_place_companion_wall(preview_transform)
+	if simple_build and selected_piece == "ramp" and Input.is_action_pressed("sprint"): _place_companion_wall(preview_transform)
 	stats_changed.emit()
 
 func _place_companion_wall(base_transform: Transform3D) -> void:
@@ -235,10 +273,8 @@ func _edit_target() -> void:
 	query.collision_mask = 4
 	var hit := get_world_3d().direct_space_state.intersect_ray(query)
 	if hit and hit.collider is BuildPiece and int(hit.collider.owner_id) == get_instance_id():
-		if simple_edit:
-			hit.collider.simple_edit_from_local_hit(hit.collider.to_local(hit.position))
-		else:
-			hit.collider.cycle_edit(false)
+		if simple_edit: hit.collider.simple_edit_from_local_hit(hit.collider.to_local(hit.position))
+		else: hit.collider.cycle_edit(false)
 
 func collect_loot(item: Dictionary) -> bool:
 	match item.get("kind", ""):
